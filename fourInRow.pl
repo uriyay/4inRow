@@ -71,14 +71,14 @@ playUser(Board, UpdatedBoard) :-
 
 playComputer(Board, UpdatedBoard) :-
     format("Computer turn!\n-------------\n"),
-    /*% for now - computer choose a random col
+    % for now - computer choose a random col
     random(1, 8, Col),
     calcRow(Col, Board, Row),
     % if row = -1 it backtracks
     Row \= -1,
-    updateBoard(Board, Col, Row, 2, UpdatedBoard).*/
+    updateBoard(Board, Col, Row, 2, UpdatedBoard).
     %for debugging:
-    UpdatedBoard = Board.
+    %UpdatedBoard = Board.
 
 % Check winning constraints
 
@@ -145,12 +145,11 @@ check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if Counter = 4 - set the winner to CurWinner
     Counter >= 4, !, Winner = CurWinner
     );
-    (
+    ((
     % else if current element = 0, then the strike has broken
     % reset the counter and set CurWinner to none
     X = 0, !,
-    CurWinner1 = none, Counter1 = 0,
-    check_col0(Rest, ColId, CurWinner1, Counter1, Winner)
+    CurWinner1 = none, Counter1 = 0
     );
     (
     % else if current element is 1 - then current winner is player
@@ -158,8 +157,7 @@ check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if the old current winner is player - increment counter
     ((CurWinner = player, !, Counter1 is Counter + 1);
     % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_col0(Rest, ColId, CurWinner1, Counter1, Winner)
+    (Counter1 = 1))
     );
     (
     % else if current element is 2 - then current winner is computer
@@ -167,24 +165,22 @@ check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if the old current winner is player - increment counter
     ((CurWinner = computer, !, Counter1 is Counter + 1);
     % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_col0(Rest, ColId, CurWinner1, Counter1, Winner)
-    )).
+    (Counter1 = 1))
+    )),
+    check_col0(Rest, ColId, CurWinner1, Counter1, Winner)).
 
 check_col(Rows, ColId, Winner) :-
     check_col0(Rows, ColId, none, 0, Winner).
 
-check_cols0([], _, CurWinner, CurWinner) :- !.
+check_cols0(_Rows, ColId, CurWinner, CurWinner) :- ColId > 7.
 check_cols0(Rows, ColId, CurWinner, Winner) :-
-    check_col(Rows, ColId, CurWinner1),
-    ((CurWinner1 = none, !, ColId1 is ColId + 1, check_cols0(Rows, ColId1, CurWinner1, Winner));
-    (Winner = CurWinner1)).
+    ((check_col(Rows, ColId, CurWinner1), Winner = CurWinner1, !);
+    (CurWinner1 = none, !, ColId1 is ColId + 1, check_cols0(Rows, ColId1, CurWinner1, Winner))).
 
 check_cols(Rows, Winner) :-
     check_cols0(Rows, 1, none, Winner),
     nonvar(Winner).
 
-%%%%
 check_left_diag0([], ColId, CurWinner, Counter, Winner) :- 
     !,
     (Counter >= 4, !, Winner = CurWinner);
@@ -198,12 +194,11 @@ check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if Counter = 4 - set the winner to CurWinner
     Counter >= 4, !, Winner = CurWinner
     );
-    (
+    ((
     % else if current element = 0, then the strike has broken
     % reset the counter and set CurWinner to none
     X = 0, !,
-    CurWinner1 = none, Counter1 = 0,
-    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    CurWinner1 = none, Counter1 = 0
     );
     (
     % else if current element is 1 - then current winner is player
@@ -211,8 +206,7 @@ check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if the old current winner is player - increment counter
     ((CurWinner = player, !, Counter1 is Counter + 1);
     % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    (Counter1 = 1))
     );
     (
     % else if current element is 2 - then current winner is computer
@@ -220,9 +214,12 @@ check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if the old current winner is player - increment counter
     ((CurWinner = computer, !, Counter1 is Counter + 1);
     % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
-    )).
+    (Counter1 = 1))
+    )),
+    % check in both next element in current diognal and also in another diagonal
+    (check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
+    %check in a new diagonal
+    check_left_diag0(Rest, ColId, CurWinner1, Counter1, Winner))).
 
 check_right_diag0([], ColId, CurWinner, Counter, Winner) :- 
     !,
@@ -237,7 +234,7 @@ check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % if Counter = 4 - set the winner to CurWinner
     Counter >= 4, !, Winner = CurWinner
     );
-    (
+    ((
     % else if current element = 0, then the strike has broken
     % reset the counter and set CurWinner to none
     X = 0, !,
@@ -261,7 +258,11 @@ check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % else - Counter1 = 1
     (Counter1 = 1)),
     check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
-    )).
+    )),
+    % check the current diagoanl
+    (check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
+    % check a new diagonal
+    check_right_diag0(Rest, ColId, CurWinner1, Counter1, Winner))).
 
 check_right_diag(Rows, ColId, Winner) :-
     check_right_diag0(Rows, ColId, none, 0, Winner).
@@ -271,10 +272,10 @@ check_left_diag(Rows, ColId, Winner) :-
 
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
-    ((check_rows(Board, Winner), nonvar(Winner), !);
-    (check_cols(Board, Winner), nonvar(Winner), !);
-    (check_right_diag(Board, 1, Winner), nonvar(Winner), !);
-    (check_left_diag(Board, 7, Winner), nonvar(Winner), !)),
+    ((check_rows(Board, Winner), !, nonvar(Winner), Winner \= none, !);
+    (check_cols(Board, Winner), !, nonvar(Winner), Winner \= none, !);
+    (check_right_diag(Board, 1, Winner), !, nonvar(Winner), Winner \= none, !);
+    (check_left_diag(Board, 7, Winner), !, nonvar(Winner), Winner \= none, !)),
     ((Winner = player, format("You won!\n--------------\n"));
     (Winner = computer, format("Computer won!\n--------------\n"))).
 
