@@ -50,7 +50,7 @@ updateBoard(Board, Col, Row, Value, UpdatedBoard) :-
     %get RowElement at Row index
     nth1(Row, Board, RowElement, RestRows),
     %get the row without the cell
-    nth1(Col, RowElement, Cell, RowElementRest),
+    nth1(Col, RowElement, _Cell, RowElementRest),
     %build a new row from RowElementRest where RowElement1[Col] = Value
     nth1(Col, RowElement1, Value, RowElementRest),
     %build a new UpdatedBoard which at Row there is RowElement1
@@ -123,9 +123,8 @@ check_row0([X|Rest], CurWinner, Counter, Winner) :-
 check_row(Row, Winner) :-
     check_row0(Row, none, 0, Winner).
     
-check_rows0([], CurWinner, CurWinner).
+check_rows0([], CurWinner, CurWinner) :- !.
 check_rows0([Row|RestRows], CurWinner, Winner) :-
-    format("Checking row: ~w\n", [Row]),
     ((check_row(Row, CurWinner1), !, Winner = CurWinner1);
     (CurWinner1 = none, !, check_rows0(RestRows, CurWinner1, Winner))).
 
@@ -175,7 +174,7 @@ check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
 check_col(Rows, ColId, Winner) :-
     check_col0(Rows, ColId, none, 0, Winner).
 
-check_cols([], _, CurWinner, CurWinner).
+check_cols0([], _, CurWinner, CurWinner) :- !.
 check_cols0(Rows, ColId, CurWinner, Winner) :-
     check_col(Rows, ColId, CurWinner1),
     ((CurWinner1 = none, !, ColId1 is ColId + 1, check_cols0(Rows, ColId1, CurWinner1, Winner));
@@ -185,10 +184,97 @@ check_cols(Rows, Winner) :-
     check_cols0(Rows, 1, none, Winner),
     nonvar(Winner).
 
+%%%%
+check_left_diag0([], ColId, CurWinner, Counter, Winner) :- 
+    !,
+    (Counter >= 4, !, Winner = CurWinner);
+    Winner = none.
+
+check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
+    % X = Row[ColId]
+    nth1(ColId, Row, X),
+    ColId1 is ColId - 1,
+    ((
+    % if Counter = 4 - set the winner to CurWinner
+    Counter >= 4, !, Winner = CurWinner
+    );
+    (
+    % else if current element = 0, then the strike has broken
+    % reset the counter and set CurWinner to none
+    X = 0, !,
+    CurWinner1 = none, Counter1 = 0,
+    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    );
+    (
+    % else if current element is 1 - then current winner is player
+    X = 1, !, CurWinner1 = player,
+    % if the old current winner is player - increment counter
+    ((CurWinner = player, !, Counter1 is Counter + 1);
+    % else - Counter1 = 1
+    (Counter1 = 1)),
+    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    );
+    (
+    % else if current element is 2 - then current winner is computer
+    X = 2, !, CurWinner1 = computer,
+    % if the old current winner is player - increment counter
+    ((CurWinner = computer, !, Counter1 is Counter + 1);
+    % else - Counter1 = 1
+    (Counter1 = 1)),
+    check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    )).
+
+check_right_diag0([], ColId, CurWinner, Counter, Winner) :- 
+    !,
+    (Counter >= 4, !, Winner = CurWinner);
+    Winner = none.
+
+check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
+    % X = Row[ColId]
+    nth1(ColId, Row, X),
+    ColId1 is ColId + 1,
+    ((
+    % if Counter = 4 - set the winner to CurWinner
+    Counter >= 4, !, Winner = CurWinner
+    );
+    (
+    % else if current element = 0, then the strike has broken
+    % reset the counter and set CurWinner to none
+    X = 0, !,
+    CurWinner1 = none, Counter1 = 0,
+    check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    );
+    (
+    % else if current element is 1 - then current winner is player
+    X = 1, !, CurWinner1 = player,
+    % if the old current winner is player - increment counter
+    ((CurWinner = player, !, Counter1 is Counter + 1);
+    % else - Counter1 = 1
+    (Counter1 = 1)),
+    check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    );
+    (
+    % else if current element is 2 - then current winner is computer
+    X = 2, !, CurWinner1 = computer,
+    % if the old current winner is player - increment counter
+    ((CurWinner = computer, !, Counter1 is Counter + 1);
+    % else - Counter1 = 1
+    (Counter1 = 1)),
+    check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner)
+    )).
+
+check_right_diag(Rows, ColId, Winner) :-
+    check_right_diag0(Rows, ColId, none, 0, Winner).
+
+check_left_diag(Rows, ColId, Winner) :-
+    check_left_diag0(Rows, ColId, none, 0, Winner).
+
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
     ((check_rows(Board, Winner), nonvar(Winner), !);
-    (check_cols(Board, Winner), nonvar(Winner), !)),
+    (check_cols(Board, Winner), nonvar(Winner), !);
+    (check_right_diag(Board, 1, Winner), nonvar(Winner), !);
+    (check_left_diag(Board, 7, Winner), nonvar(Winner), !)),
     ((Winner = player, format("You won!\n--------------\n"));
     (Winner = computer, format("Computer won!\n--------------\n"))).
 
