@@ -218,8 +218,11 @@ check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     )),
     % check in both next element in current diognal and also in another diagonal
     (check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
-    %check in a new diagonal
-    check_left_diag0(Rest, ColId, none, 0, Winner))).
+    %check in a new diagonal with Rest lines
+    check_left_diag0(Rest, ColId, none, 0, Winner);
+    %check in a new diagonal with all lines
+    check_left_diag0([Row|Rest], ColId1, none, 0, Winner)
+    )).
 
 check_right_diag0([], ColId, CurWinner, Counter, Winner) :- 
     !,
@@ -259,7 +262,10 @@ check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % check the current diagoanl
     (check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
     % check a new diagonal
-    check_right_diag0(Rest, ColId, none, 0, Winner))).
+    check_right_diag0(Rest, ColId, none, 0, Winner);
+    %check in a new diagonal with all lines
+    check_right_diag0([Row|Rest], ColId1, none, 0, Winner)
+    )).
 
 check_right_diag(Rows, ColId, Winner) :-
     check_right_diag0(Rows, ColId, none, 0, Winner).
