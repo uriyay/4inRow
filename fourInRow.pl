@@ -86,8 +86,12 @@ move(Pos, Pos1) :-
 
 staticval(Pos, Val) :-
     Pos = pos(Board, Player),
-    %for now - just count the disks of Player
-    count_disks(Board, Player, Val).
+    ((won0(Board, Winner),
+    (Winner = player, Val is 1);
+    (Winner = computer, Val is -1));
+    Val is 0).
+    %for now - just count the disks of player
+    %count_disks(Board, player, Val).
 
 count_disks(Board, Player, Val) :-
     ((Player = player, !, Elem = 1);
@@ -365,12 +369,15 @@ check_right_diag(Rows, ColId, Winner) :-
 check_left_diag(Rows, ColId, Winner) :-
     check_left_diag0(Rows, ColId, none, 0, Winner).
 
-% check if there is a win: 4 in row, in column or in diagonal
-won(Board, Winner) :-
+won0(Board, Winner) :-
     ((check_rows(Board, Winner), nonvar(Winner), Winner \= none, !);
     (check_cols(Board, Winner), nonvar(Winner), Winner \= none, !);
     (check_right_diag(Board, 1, Winner), nonvar(Winner), Winner \= none, !);
-    (check_left_diag(Board, 7, Winner), nonvar(Winner), Winner \= none, !)),
+    (check_left_diag(Board, 7, Winner), nonvar(Winner), Winner \= none, !)).
+
+% check if there is a win: 4 in row, in column or in diagonal
+won(Board, Winner) :-
+    won0(Board, Winner),
     ((Winner = player, !, format("You won!\n--------------\n"));
     (Winner = computer, format("Computer won!\n--------------\n"))).
 
