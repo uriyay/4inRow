@@ -62,31 +62,30 @@ getCell(Board, Row, Col, Value) :-
 
 /****  The alpha-beta algorithm ***/
 /*
-Pos = pos(Board, RowId, ColId, Player)
+Pos = pos(Board, Player)
 where Player can be computer or player
 Since the player always play first, then he will be Max and the computer will be Min
 */
-max_to_move(pos(_, _, _, player)).
-min_to_move(pos(_, _, _, computer)).
+max_to_move(pos(_, player)).
+min_to_move(pos(_, computer)).
 
 % moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
 moves(Pos, PosList) :-
     setof(Pos1, move(Pos, Pos1), PosList).
 
 move(Pos, Pos1) :-
-    Pos = pos(Board, RowId, ColId, Player),
+    Pos = pos(Board, Player),
     % when choosing a column it doesn't matter who the player is
-    number(ColId1),
-    ColId1 >= 0,
-    ColId1 =< 7,
+    between(1, 7, ColId1),
     calcRow(ColId1, Board, RowId1),
-    ((Player = player, !, Player1 = computer, Val = 2);
-    (Player = computer, !, Player1 = player, Val = 1)),
+    RowId1 \= -1,
+    ((Player = player, Player1 = computer, Val = 1);
+    (Player = computer, Player1 = player, Val = 2)),
     updateBoard(Board, ColId1, RowId1, Val, UpdatedBoard),
-    Pos1 = (UpdatedBoard, RowId1, ColId1, Player1).
+    Pos1 = pos(UpdatedBoard, Player1).
 
 staticval(Pos, Val) :-
-    Pos = pos(Board, RowId, ColId, Player),
+    Pos = pos(Board, Player),
     %for now - just count the disks of Player
     count_disks(Board, Player, Val).
 
@@ -108,25 +107,32 @@ count_disks_in_row([X|Rest], Elem, Val) :-
     ((X = Elem, !, Val is Val1 + 1);
     (Val is Val1)).
 
-alphabeta(Pos, Alpha, Beta, GoodPos, Val) :- 
-    moves( Pos, PosList), !, 
-    boundedbest( PosList, Alpha, Beta, GoodPos, Val); 
+alphabeta(Pos, Alpha, Beta, GoodPos, Val, MaxDepth) :- 
+    Beta is 10000,
+    Alpha is -Beta,
+    alphabeta0(Pos, Alpha, Beta, GoodPos, Val, 1, MaxDepth).
+
+alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :- 
+    CurDepth =< MaxDepth,
+    moves(Pos, PosList), !, 
+    CurDepth1 is CurDepth + 1,
+    boundedbest(PosList, Alpha, Beta, GoodPos, Val, CurDepth1, MaxDepth); 
     staticval(Pos, Val). % Static value Of Pos 
     
-boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal) :-
-    alphabeta(Pos, Alpha, Beta, _, Val), 
-    goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal).
+boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal, CurDepth, MaxDepth) :-
+    alphabeta0(Pos, Alpha, Beta, _, Val, CurDepth, MaxDepth), 
+    goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal, CurDepth, MaxDepth).
 
-goodenough([], _ , _ , Pos, Val, Pos, Val) :- !. % No Other candidate 
+goodenough([], _ , _ , Pos, Val, Pos, Val, CurDepth, MaxDepth) :- !. % No Other candidate 
     
-goodenough( _, Alpha, Beta, Pos, Val, Pos, Val) :-
+goodenough( _, Alpha, Beta, Pos, Val, Pos, Val, CurDepth, MaxDepth) :-
     min_to_move(Pos), Val > Beta, !; % Maximizer attained upper bound 
     max_to_move(Pos), Val < Alpha, !. % Minimizer attained lower bound
 
-goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal) :-
+goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal, CurDepth, MaxDepth) :-
     newbounds(Alpha, Beta, Pos, Val, NewAlpha, NewBeta), 
-    boundedbest(PosList, NewAlpha, NewBeta, Pos1, Vall), 
-    betterof( Pos, Val, Pos1, Vall, GoodPos, GoodVal). 
+    boundedbest(PosList, NewAlpha, NewBeta, Pos1, Val1, CurDepth, MaxDepth), 
+    betterof(Pos, Val, Pos1, Val1, GoodPos, GoodVal). 
 
 newbounds(Alpha, Beta, Pos, Val, Val, Beta) :- 
     min_to_move(Pos), Val > Alpha, !. % Maximizer increased lower bound 
@@ -136,11 +142,11 @@ newbounds(Alpha, Beta, Pos, Val, Alpha, Val) :-
 
 newbounds(Alpha, Beta, _, _, Alpha, Beta). % Otherwise bounds unchanged 
 
-betterof( Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
-    min_to_move(Pos), Val > Vall, !; 
-    max_to_move(Pos), Val < Vall, !.
+betterof(Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
+    min_to_move(Pos), Val > Val1, !; 
+    max_to_move(Pos), Val < Val1, !.
 
-betterof( _, _ , Posl, Vail, Posl, Vall). % Otherwise Pos1 better
+betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 
 /******/
 
@@ -156,11 +162,13 @@ playUser(Board, UpdatedBoard) :-
 playComputer(Board, UpdatedBoard) :-
     format("Computer turn!\n-------------\n"),
     % for now - computer choose a random col
-    random(1, 8, Col),
-    calcRow(Col, Board, Row),
+    %random(1, 8, Col),
+    %calcRow(Col, Board, Row),
     % if row = -1 it backtracks
-    Row \= -1,
-    updateBoard(Board, Col, Row, 2, UpdatedBoard).
+    %Row \= -1,
+    Pos = pos(Board, computer),
+    alphabeta(Pos, _, _, GoodPos, _, 3),
+    GoodPos = pos(UpdatedBoard, Player).
     %for debugging:
     %UpdatedBoard = Board.
 
@@ -367,18 +375,19 @@ won(Board, Winner) :-
     (Winner = computer, format("Computer won!\n--------------\n"))).
 
 play0(Board, player, UpdatedBoard) :-
-    displayBoard(Board),
     playUser(Board, UpdatedBoard1), !,
-    ((won(UpdatedBoard1, Winner), displayBoard(UpdatedBoard1));
+    displayBoard(UpdatedBoard1),
+    ((won(UpdatedBoard1, Winner));
     play0(UpdatedBoard1, computer, UpdatedBoard)).
 
 play0(Board, computer, UpdatedBoard) :-
-    displayBoard(Board),
     playComputer(Board, UpdatedBoard1), !,
+    displayBoard(UpdatedBoard1),
     (won(UpdatedBoard1, Winner);
     play0(UpdatedBoard1, player, UpdatedBoard)).
 
 play(Board, UpdatedBoard) :-
+    displayBoard(Board),
     play0(Board, player, UpdatedBoard).
 
 start :-
