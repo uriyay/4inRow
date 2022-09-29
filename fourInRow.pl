@@ -60,6 +60,90 @@ getCell(Board, Row, Col, Value) :-
     nth1(Row, Board, RowElement),
     nth1(Col, RowElement, Value).
 
+/****  The alpha-beta algorithm ***/
+/*
+Pos = pos(Board, RowId, ColId, Player)
+where Player can be computer or player
+Since the player always play first, then he will be Max and the computer will be Min
+*/
+max_to_move(pos(_, _, _, player)).
+min_to_move(pos(_, _, _, computer)).
+
+% moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
+moves(Pos, PosList) :-
+    setof(Pos1, move(Pos, Pos1), PosList).
+
+move(Pos, Pos1) :-
+    Pos = pos(Board, RowId, ColId, Player),
+    % when choosing a column it doesn't matter who the player is
+    number(ColId1),
+    ColId1 >= 0,
+    ColId1 =< 7,
+    calcRow(ColId1, Board, RowId1),
+    ((Player = player, !, Player1 = computer, Val = 2);
+    (Player = computer, !, Player1 = player, Val = 1)),
+    updateBoard(Board, ColId1, RowId1, Val, UpdatedBoard),
+    Pos1 = (UpdatedBoard, RowId1, ColId1, Player1).
+
+staticval(Pos, Val) :-
+    Pos = pos(Board, RowId, ColId, Player),
+    %for now - just count the disks of Player
+    count_disks(Board, Player, Val).
+
+count_disks(Board, Player, Val) :-
+    ((Player = player, !, Elem = 1);
+    (Player = computer, !, Elem = 2)),
+    count_disks0(Board, Elem, Val).
+
+count_disks0([], Elem, 0).
+
+count_disks0([Row|Rest], Elem, Val) :-
+    count_disks0(Rest, Elem, Val1),
+    count_disks_in_row(Row, Elem, Val2),
+    Val is Val1 + Val2.
+
+count_disks_in_row([], Elem, 0).
+count_disks_in_row([X|Rest], Elem, Val) :-
+    count_disks_in_row(Rest, Elem, Val1),
+    ((X = Elem, !, Val is Val1 + 1);
+    (Val is Val1)).
+
+alphabeta(Pos, Alpha, Beta, GoodPos, Val) :- 
+    moves( Pos, PosList), !, 
+    boundedbest( PosList, Alpha, Beta, GoodPos, Val); 
+    staticval(Pos, Val). % Static value Of Pos 
+    
+boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal) :-
+    alphabeta(Pos, Alpha, Beta, _, Val), 
+    goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal).
+
+goodenough([], _ , _ , Pos, Val, Pos, Val) :- !. % No Other candidate 
+    
+goodenough( _, Alpha, Beta, Pos, Val, Pos, Val) :-
+    min_to_move(Pos), Val > Beta, !; % Maximizer attained upper bound 
+    max_to_move(Pos), Val < Alpha, !. % Minimizer attained lower bound
+
+goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal) :-
+    newbounds(Alpha, Beta, Pos, Val, NewAlpha, NewBeta), 
+    boundedbest(PosList, NewAlpha, NewBeta, Pos1, Vall), 
+    betterof( Pos, Val, Pos1, Vall, GoodPos, GoodVal). 
+
+newbounds(Alpha, Beta, Pos, Val, Val, Beta) :- 
+    min_to_move(Pos), Val > Alpha, !. % Maximizer increased lower bound 
+
+newbounds(Alpha, Beta, Pos, Val, Alpha, Val) :- 
+    max_to_move( Pos), Val < Beta, !. % Minimizer decreased upper bound 
+
+newbounds(Alpha, Beta, _, _, Alpha, Beta). % Otherwise bounds unchanged 
+
+betterof( Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
+    min_to_move(Pos), Val > Vall, !; 
+    max_to_move(Pos), Val < Vall, !.
+
+betterof( _, _ , Posl, Vail, Posl, Vall). % Otherwise Pos1 better
+
+/******/
+
 playUser(Board, UpdatedBoard) :-
     format("Player turn!\n-------------\n"),
     getCol(Col),
