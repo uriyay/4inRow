@@ -87,11 +87,7 @@ min_to_move(pos(_, computer)).
 
 % moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
 moves(Pos, PosList) :-
-    Pos = pos(Board, Player),
-    %TODO: drop PosList if Pos 
-    ((won0(Board, _), PosList = [Pos]);
-    (setof(Pos1, move(Pos, Pos1), PosList))).
-    %setof(Pos1, move(Pos, Pos1), PosList).
+    setof(Pos1, move(Pos, Pos1), PosList).
 
 move(Pos, Pos1) :-
     Pos = pos(Board, Player),
@@ -106,9 +102,10 @@ move(Pos, Pos1) :-
 
 staticval(Pos, Val) :-
     Pos = pos(Board, Player),
-    ((won0(Board, Winner),
-    (Winner = player, Val is 1);
-    (Winner = computer, Val is -1));
+    (((won0(Board, Winner),
+    nonvar(Winner)),
+    ((Winner = player, Val is 1);
+    (Winner = computer, Val is -1)));
     Val is 0).
     %for now - just count the disks of player
     %count_disks(Board, player, Val).
@@ -132,16 +129,23 @@ count_disks_in_row([X|Rest], Elem, Val) :-
     (Val is Val1)).
 
 alphabeta(Pos, Alpha, Beta, GoodPos, Val, MaxDepth) :- 
-    Beta is 10000,
+    Beta is 1,
     Alpha is -Beta,
     alphabeta0(Pos, Alpha, Beta, GoodPos, Val, 1, MaxDepth).
 
 alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :- 
-    CurDepth =< MaxDepth,
-    moves(Pos, PosList), !, 
+    staticval(Pos, Val1), % Static value Of Pos 
+    (
+    % if max depth exceeded or that Pos is a winning state - return Val
+    ((CurDepth > MaxDepth;
+    Val1 = 1;
+    Val1 = -1),
+    Val = Val1,
+    GoodPos = Pos);
+    % else - evaluate the children of Pos
+    (moves(Pos, PosList), !, 
     CurDepth1 is CurDepth + 1,
-    boundedbest(PosList, Alpha, Beta, GoodPos, Val, CurDepth1, MaxDepth); 
-    staticval(Pos, Val). % Static value Of Pos 
+    boundedbest(PosList, Alpha, Beta, GoodPos, Val, CurDepth1, MaxDepth))).
     
 boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal, CurDepth, MaxDepth) :-
     alphabeta0(Pos, Alpha, Beta, _, Val, CurDepth, MaxDepth), 
