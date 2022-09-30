@@ -15,9 +15,25 @@ init(Board) :-
         [0, 0, 0, 0, 0, 0, 0]
     ].
 
+displayLine([]) :- 
+    !, format("\n").
+
+displayLine([X|Rest]) :-
+    ((X = 0, !, D = " ");
+    (X = 1, !, D = "O");
+    (X = 2, !, D = "#")),
+    format("[~w]", D),
+    displayLine(Rest).
+
+displayLines([]) :- !.
+displayLines([Line|Rest]) :-
+    displayLine(Line),
+    displayLines(Rest).
+
 displayBoard(Board) :-
-    Board = [R1, R2, R3, R4, R5, R6],
-    format("~w\n~w\n~w\n~w\n~w\n~w\n", [R1, R2, R3, R4, R5, R6]).
+    displayLines(Board),
+    format("---------------------\n"),
+    format("[1][2][3][4][5][6][7]\n").
 
 /* getAnswer(+Answer) - reads one-char answer and returns it as an atomic (for example: "1" -> 1) */
 getAnswer(Answer) :-
@@ -71,7 +87,11 @@ min_to_move(pos(_, computer)).
 
 % moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
 moves(Pos, PosList) :-
-    setof(Pos1, move(Pos, Pos1), PosList).
+    Pos = pos(Board, Player),
+    %TODO: drop PosList if Pos 
+    ((won0(Board, _), PosList = [Pos]);
+    (setof(Pos1, move(Pos, Pos1), PosList))).
+    %setof(Pos1, move(Pos, Pos1), PosList).
 
 move(Pos, Pos1) :-
     Pos = pos(Board, Player),
@@ -171,7 +191,7 @@ playComputer(Board, UpdatedBoard) :-
     % if row = -1 it backtracks
     %Row \= -1,
     Pos = pos(Board, computer),
-    alphabeta(Pos, _, _, GoodPos, _, 3),
+    alphabeta(Pos, _, _, GoodPos, _, 4),
     GoodPos = pos(UpdatedBoard, Player).
     %for debugging:
     %UpdatedBoard = Board.
@@ -282,6 +302,9 @@ check_left_diag0([], ColId, CurWinner, Counter, Winner) :-
     (Counter >= 4, !, Winner = CurWinner);
     Winner = none.
 
+check_left_diag0(_, ColId, CurWinner, Counter, Winner) :- 
+    ColId < 1, !, fail.
+
 check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
     nth1(ColId, Row, X),
@@ -324,6 +347,9 @@ check_right_diag0([], ColId, CurWinner, Counter, Winner) :-
     !,
     (Counter >= 4, !, Winner = CurWinner);
     Winner = none.
+
+check_right_diag0(_, ColId, CurWinner, Counter, Winner) :- 
+    ColId > 7, !, fail.
 
 check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
