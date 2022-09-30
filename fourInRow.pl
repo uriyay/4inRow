@@ -322,7 +322,9 @@ check_left_diag0([], ColId, CurWinner, Counter, Winner) :-
     Winner = none.
 
 check_left_diag0(_, ColId, CurWinner, Counter, Winner) :- 
-    ColId < 1, !, fail.
+    ColId < 1, !,
+    (Counter >= 4, !, Winner = CurWinner);
+    Winner = none.
 
 check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
@@ -368,7 +370,10 @@ check_right_diag0([], ColId, CurWinner, Counter, Winner) :-
     Winner = none.
 
 check_right_diag0(_, ColId, CurWinner, Counter, Winner) :- 
-    ColId > 7, !, fail.
+    ColId > 7,
+    !,
+    (Counter >= 4, !, Winner = CurWinner);
+    Winner = none.
 
 check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
@@ -414,9 +419,39 @@ check_right_diag(Rows, ColId, Winner) :-
 check_left_diag(Rows, ColId, Winner) :-
     check_left_diag0(Rows, ColId, none, 0, Winner).
 
+cutRow([], CurColId, MinColId, MaxColId, []) :- !.
+
+cutRow([X|Rest], CurColId, MinColId, MaxColId, [X|SubCol]) :-
+    CurColId >= MinColId,
+    CurColId =< MaxColId, !,
+    CurColId1 is CurColId + 1,
+    cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
+
+cutRow([X|Rest], CurColId, MinColId, MaxColId, SubCol) :-
+    CurColId1 is CurColId + 1,
+    cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
+
+% cutBoard0(-InnerBoard, -MinRowId, -MinColId, -MaxColId, +SubBoard)
+cutBoard0([], _CurRowId, _MinRowId, _MinColId, _MaxColId, []) :- !.
+
+cutBoard0([Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, [Row1|SubBoard]) :-
+    CurRowId >= MinRowId, !,
+    CurRowId1 is CurRowId + 1,
+    cutRow(Row, 1, MinColId, MaxColId, Row1),
+    cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
+
+cutBoard0([Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, SubBoard) :-
+    CurRowId < MinRowId,
+    CurRowId1 is CurRowId + 1,
+    cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
+
+cutBoard(Board, SubBoard) :-
+    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    cutBoard0(InnerBoard, 1, MinRowId, MinColId, MaxColId, SubBoard).
+
 won0(Board, Winner) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
-    InnerBoard1 = InnerBoard,
+    cutBoard(Board, InnerBoard1),
     ((MaxColId - MinColId >= 3, check_rows(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
     (6 - MinRowId >= 3, check_cols(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
     (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, Winner), nonvar(Winner), Winner \= none, !);
