@@ -5,15 +5,19 @@ computer cell: 2
 */
 
 init(Board) :-
+    %Board = (MinRowId, MinColId, MaxColId, InnerBoard)
     % 7 columns and 6 rows
-    Board = [
+    %At first MinColId = 7 and MaxColId = 1, later updateBoard will set them correctly
+    Board = (6, 7, 1, [
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0]
-    ].
+    ]).
+
+getInnerBoard((_MinRowId, _MinColId, _MaxColId, InnerBoard), InnerBoard).
 
 displayLine([]) :- 
     !, format("\n").
@@ -31,7 +35,8 @@ displayLines([Line|Rest]) :-
     displayLines(Rest).
 
 displayBoard(Board) :-
-    displayLines(Board),
+    getInnerBoard(Board, InnerBoard),
+    displayLines(InnerBoard),
     format("---------------------\n"),
     format("[1][2][3][4][5][6][7]\n").
 
@@ -63,14 +68,22 @@ getCol(Col) :-
     (format("Error: invalid answer\n"), getCol(Col)).
 
 updateBoard(Board, Col, Row, Value, UpdatedBoard) :-
+    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
     %get RowElement at Row index
-    nth1(Row, Board, RowElement, RestRows),
+    nth1(Row, InnerBoard, RowElement, RestRows),
     %get the row without the cell
     nth1(Col, RowElement, _Cell, RowElementRest),
     %build a new row from RowElementRest where RowElement1[Col] = Value
     nth1(Col, RowElement1, Value, RowElementRest),
     %build a new UpdatedBoard which at Row there is RowElement1
-    nth1(Row, UpdatedBoard, RowElement1, RestRows).
+    nth1(Row, UpdatedInnerBoard, RowElement1, RestRows),
+    ((Row < MinRowId, !, MinRowId1 = Row);
+    (MinRowId1 = MinRowId)),
+    ((Col < MinColId, !, MinColId1 = Col);
+    (MinColId1 = MinColId)),
+    ((Col > MaxColId, !, MaxColId1 = Col);
+    (MaxColId1 = MaxColId)),
+    UpdatedBoard = (MinRowId1, MinColId1, MaxColId1, UpdatedInnerBoard).
 
 getCell(Board, Row, Col, Value) :-
     nth1(Row, Board, RowElement),
@@ -91,9 +104,10 @@ moves(Pos, PosList) :-
 
 move(Pos, Pos1) :-
     Pos = pos(Board, Player),
+    getInnerBoard(Board, InnerBoard),
     % when choosing a column it doesn't matter who the player is
     between(1, 7, ColId1),
-    calcRow(ColId1, Board, RowId1),
+    calcRow(ColId1, InnerBoard, RowId1),
     RowId1 \= -1,
     ((Player = player, Player1 = computer, Val = 1);
     (Player = computer, Player1 = player, Val = 2)),
@@ -179,9 +193,10 @@ betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 /******/
 
 playUser(Board, UpdatedBoard) :-
+    getInnerBoard(Board, InnerBoard),
     format("Player turn!\n-------------\n"),
     getCol(Col),
-    calcRow(Col, Board, Row),
+    calcRow(Col, InnerBoard, Row),
     %if Row = -1 currently it fail
     Row \= -1,
     %set Board[col, row] = 1
@@ -400,10 +415,12 @@ check_left_diag(Rows, ColId, Winner) :-
     check_left_diag0(Rows, ColId, none, 0, Winner).
 
 won0(Board, Winner) :-
-    ((check_rows(Board, Winner), nonvar(Winner), Winner \= none, !);
-    (check_cols(Board, Winner), nonvar(Winner), Winner \= none, !);
-    (check_right_diag(Board, 1, Winner), nonvar(Winner), Winner \= none, !);
-    (check_left_diag(Board, 7, Winner), nonvar(Winner), Winner \= none, !)).
+    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    InnerBoard1 = InnerBoard,
+    ((MaxColId - MinColId >= 3, check_rows(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
+    (6 - MinRowId >= 3, check_cols(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
+    (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, Winner), nonvar(Winner), Winner \= none, !);
+    (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_left_diag(InnerBoard1, 7, Winner), nonvar(Winner), Winner \= none, !)).
 
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
