@@ -100,7 +100,8 @@ min_to_move(pos(_, computer)).
 
 % moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
 moves(Pos, PosList) :-
-    setof(Pos1, move(Pos, Pos1), PosList).
+    (setof(Pos1, move(Pos, Pos1), PosList), !);
+    PosList = [].
 
 move(Pos, Pos1) :-
     Pos = pos(Board, Player),
@@ -115,32 +116,15 @@ move(Pos, Pos1) :-
     Pos1 = pos(UpdatedBoard, Player1).
 
 staticval(Pos, Val) :-
-    Pos = pos(Board, Player),
+    Pos = pos(Board, _Player),
     (((won0(Board, Winner),
     nonvar(Winner)),
+    %since player is always max and computer is always min - 
+    %if player win - return a positive value
+    %and if computer wins - return a negative value
     ((Winner = player, Val is 1);
     (Winner = computer, Val is -1)));
     Val is 0).
-    %for now - just count the disks of player
-    %count_disks(Board, player, Val).
-
-count_disks(Board, Player, Val) :-
-    ((Player = player, !, Elem = 1);
-    (Player = computer, !, Elem = 2)),
-    count_disks0(Board, Elem, Val).
-
-count_disks0([], Elem, 0).
-
-count_disks0([Row|Rest], Elem, Val) :-
-    count_disks0(Rest, Elem, Val1),
-    count_disks_in_row(Row, Elem, Val2),
-    Val is Val1 + Val2.
-
-count_disks_in_row([], Elem, 0).
-count_disks_in_row([X|Rest], Elem, Val) :-
-    count_disks_in_row(Rest, Elem, Val1),
-    ((X = Elem, !, Val is Val1 + 1);
-    (Val is Val1)).
 
 alphabeta(Pos, Alpha, Beta, GoodPos, Val, MaxDepth) :- 
     Beta is 1,
@@ -157,9 +141,14 @@ alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :-
     Val = Val1,
     GoodPos = Pos);
     % else - evaluate the children of Pos
-    (moves(Pos, PosList), !, 
-    CurDepth1 is CurDepth + 1,
-    boundedbest(PosList, Alpha, Beta, GoodPos, Val, CurDepth1, MaxDepth))).
+    (moves(Pos, PosList), !,
+    (
+    %if PosList is empty - return GoodPos = Pos, Val = Val1
+    (not(member(_Elem, PosList)), !, GoodPos = Pos, Val = Val1);
+    %else - evaluate the children
+    (CurDepth1 is CurDepth + 1,
+    boundedbest(PosList, Alpha, Beta, GoodPos, Val, CurDepth1, MaxDepth)))
+    )).
     
 boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal, CurDepth, MaxDepth) :-
     alphabeta0(Pos, Alpha, Beta, _, Val, CurDepth, MaxDepth), 
@@ -457,11 +446,24 @@ won0(Board, Winner) :-
     (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, Winner), nonvar(Winner), Winner \= none, !);
     (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_left_diag(InnerBoard1, 7, Winner), nonvar(Winner), Winner \= none, !)).
 
+is_tie(Board) :-
+    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    MinRowId = 1,
+    MinColId = 1,
+    MaxColId = 7,
+    InnerBoard = [FirstRow|_Tail],
+    not(member(0, FirstRow)),
+    format("Tie!\n----------------\n").
+
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
-    won0(Board, Winner),
+    (won0(Board, Winner),
+    nonvar(Winner),
+    Winner \= none,
+    !,
     ((Winner = player, !, format("You won!\n--------------\n"));
-    (Winner = computer, format("Computer won!\n--------------\n"))).
+    (Winner = computer, format("Computer won!\n--------------\n"))));
+    (is_tie(Board)).
 
 play0(Board, player, UpdatedBoard) :-
     playUser(Board, UpdatedBoard1), !,
