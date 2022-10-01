@@ -24,9 +24,11 @@ displayLine([]) :-
 
 displayLine([X|Rest]) :-
     ((X = 0, !, D = " ");
-    (X = 1, !, D = "O");
-    (X = 2, !, D = "#")),
-    format("[~w]", D),
+    (X = 1, !, D = "o", FG=green);
+    (X = 2, !, D = "#", FG=red)),
+    format("["),
+    ansi_format([bold, fg(FG)], "~w", D),
+    format("]"),
     displayLine(Rest).
 
 displayLines([]) :- !.
@@ -475,7 +477,7 @@ is_tie(Board) :-
     MaxColId = 7,
     InnerBoard = [FirstRow|_Tail],
     not(member(0, FirstRow)),
-    format("Tie!\n----------------\n").
+    ansi_format([bold, fg(blue)], "Tie!\n", []).
 
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
@@ -483,8 +485,8 @@ won(Board, Winner) :-
     nonvar(Winner),
     Winner \= none,
     !,
-    ((Winner = player, !, format("You won!\n--------------\n"));
-    (Winner = computer, format("Computer won!\n--------------\n"))));
+    ((Winner = player, !, ansi_format([bold, fg(green)], "You won!\n", []));
+    (Winner = computer, ansi_format([bold, fg(red)], "Computer won!\n", []))));
     (is_tie(Board)).
 
 play0(Board, player, UpdatedBoard) :-
