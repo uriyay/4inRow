@@ -445,10 +445,28 @@ won0(Board, Winner) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
     cutBoard(Board, InnerBoard1),
     MaxCutColId is MaxColId - MinColId + 1,
-    ((MaxCutColId >= 4, check_rows(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
-    (6 - MinRowId + 1 >= 4, check_cols(InnerBoard1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !);
-    (MaxCutColId >= 4, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !);
-    (MaxCutColId >= 4, 6 - MinRowId >= 3, check_left_diag(InnerBoard1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !)).
+    (
+        (
+            MaxCutColId >= 4,
+            check_rows(InnerBoard1, Winner),
+            nonvar(Winner), Winner \= none, !
+        );
+        (
+            6 - MinRowId + 1 >= 4,
+            check_cols(InnerBoard1, MaxCutColId, Winner),
+            nonvar(Winner), Winner \= none, !
+        );
+        (
+            MaxCutColId >= 4, 6 - MinRowId >= 3,
+            check_right_diag(InnerBoard1, 1, MaxCutColId, Winner),
+            nonvar(Winner), Winner \= none, !
+        );
+        (
+            MaxCutColId >= 4, 6 - MinRowId >= 3,
+            check_left_diag(InnerBoard1, MaxCutColId, Winner),
+            nonvar(Winner), Winner \= none, !
+        )
+    ).
 
 is_tie(Board) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
