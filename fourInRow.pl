@@ -115,29 +115,29 @@ move(Pos, Pos1) :-
     updateBoard(Board, ColId1, RowId1, Val, UpdatedBoard),
     Pos1 = pos(UpdatedBoard, Player1).
 
-staticval(Pos, Val) :-
+staticval(Pos, CurDepth, MaxDepth, Val) :-
     Pos = pos(Board, _Player),
     (((won0(Board, Winner),
     nonvar(Winner)),
     %since player is always max and computer is always min - 
     %if player win - return a positive value
     %and if computer wins - return a negative value
-    ((Winner = player, Val is 1);
-    (Winner = computer, Val is -1)));
+    %also, give a greater reward on minimal depth (faster win)
+    ((Winner = player, Val is 1 + MaxDepth - CurDepth);
+    (Winner = computer, Val is -1 - (MaxDepth - CurDepth))));
     Val is 0).
 
 alphabeta(Pos, Alpha, Beta, GoodPos, Val, MaxDepth) :- 
-    Beta is 1,
+    Beta is 10,
     Alpha is -Beta,
     alphabeta0(Pos, Alpha, Beta, GoodPos, Val, 1, MaxDepth).
 
 alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :- 
-    staticval(Pos, Val1), % Static value Of Pos 
+    staticval(Pos, CurDepth, MaxDepth, Val1), % Static value Of Pos 
     (
     % if max depth exceeded or that Pos is a winning state - return Val
     ((CurDepth > MaxDepth;
-    Val1 = 1;
-    Val1 = -1),
+    Val1 \= 0),
     Val = Val1,
     GoodPos = Pos);
     % else - evaluate the children of Pos
@@ -296,13 +296,16 @@ check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
 check_col(Rows, ColId, Winner) :-
     check_col0(Rows, ColId, none, 0, Winner).
 
-check_cols0(_Rows, ColId, CurWinner, CurWinner) :- ColId > 7, !.
-check_cols0(Rows, ColId, CurWinner, Winner) :-
+check_cols0(_Rows, ColId, MaxColId, CurWinner, CurWinner) :- ColId > MaxColId, !.
+check_cols0(Rows, ColId, MaxColId, CurWinner, Winner) :-
     ((check_col(Rows, ColId, CurWinner1), Winner = CurWinner1, !);
-    (CurWinner1 = none, !, ColId1 is ColId + 1, check_cols0(Rows, ColId1, CurWinner1, Winner))).
+    (CurWinner1 = none,
+    !,
+    ColId1 is ColId + 1,
+    check_cols0(Rows, ColId1, MaxColId, CurWinner1, Winner))).
 
-check_cols(Rows, Winner) :-
-    check_cols0(Rows, 1, none, Winner),
+check_cols(Rows, MaxColId, Winner) :-
+    check_cols0(Rows, 1, MaxColId, none, Winner),
     nonvar(Winner).
 
 check_left_diag0([], ColId, CurWinner, Counter, Winner) :- 
@@ -312,8 +315,8 @@ check_left_diag0([], ColId, CurWinner, Counter, Winner) :-
 
 check_left_diag0(_, ColId, CurWinner, Counter, Winner) :- 
     ColId < 1, !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
+    ((Counter >= 4, !, Winner = CurWinner);
+    Winner = none).
 
 check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
@@ -346,25 +349,25 @@ check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     (Counter1 = 1))
     )),
     % check in both next element in current diognal and also in another diagonal
-    (check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
+    ((check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner), Winner \= none);
     %check in a new diagonal with Rest lines
-    check_left_diag0(Rest, ColId, none, 0, Winner);
+    (check_left_diag0(Rest, ColId, none, 0, Winner), Winner \= none);
     %check in a new diagonal with all lines
-    check_left_diag0([Row|Rest], ColId1, none, 0, Winner)
+    (check_left_diag0([Row|Rest], ColId1, none, 0, Winner), Winner \= none)
     )).
 
-check_right_diag0([], ColId, CurWinner, Counter, Winner) :- 
+check_right_diag0([], ColId, MaxColId, CurWinner, Counter, Winner) :- 
     !,
     (Counter >= 4, !, Winner = CurWinner);
     Winner = none.
 
-check_right_diag0(_, ColId, CurWinner, Counter, Winner) :- 
-    ColId > 7,
+check_right_diag0(_, ColId, MaxColId, CurWinner, Counter, Winner) :- 
+    ColId > MaxColId,
     !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
+    ((Counter >= 4, !, Winner = CurWinner);
+    Winner = none).
 
-check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
+check_right_diag0([Row|Rest], ColId, MaxColId, CurWinner, Counter, Winner) :-
     % X = Row[ColId]
     nth1(ColId, Row, X),
     ColId1 is ColId + 1,
@@ -395,15 +398,15 @@ check_right_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
     (Counter1 = 1))
     )),
     % check the current diagoanl
-    (check_right_diag0(Rest, ColId1, CurWinner1, Counter1, Winner);
+    ((check_right_diag0(Rest, ColId1, MaxColId, CurWinner1, Counter1, Winner), Winner \= none);
     % check a new diagonal
-    check_right_diag0(Rest, ColId, none, 0, Winner);
+    (check_right_diag0(Rest, ColId, MaxColId, none, 0, Winner), Winner \= none);
     %check in a new diagonal with all lines
-    check_right_diag0([Row|Rest], ColId1, none, 0, Winner)
+    (check_right_diag0([Row|Rest], ColId1, MaxColId, none, 0, Winner), Winner \= none)
     )).
 
-check_right_diag(Rows, ColId, Winner) :-
-    check_right_diag0(Rows, ColId, none, 0, Winner).
+check_right_diag(Rows, ColId, MaxColId, Winner) :-
+    check_right_diag0(Rows, ColId, MaxColId, none, 0, Winner).
 
 check_left_diag(Rows, ColId, Winner) :-
     check_left_diag0(Rows, ColId, none, 0, Winner).
@@ -441,10 +444,11 @@ cutBoard(Board, SubBoard) :-
 won0(Board, Winner) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
     cutBoard(Board, InnerBoard1),
-    ((MaxColId - MinColId >= 3, check_rows(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
-    (6 - MinRowId >= 3, check_cols(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
-    (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, Winner), nonvar(Winner), Winner \= none, !);
-    (MaxColId - MinColId >= 3, 6 - MinRowId >= 3, check_left_diag(InnerBoard1, 7, Winner), nonvar(Winner), Winner \= none, !)).
+    MaxCutColId is MaxColId - MinColId + 1,
+    ((MaxCutColId >= 4, check_rows(InnerBoard1, Winner), nonvar(Winner), Winner \= none, !);
+    (6 - MinRowId + 1 >= 4, check_cols(InnerBoard1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !);
+    (MaxCutColId >= 4, 6 - MinRowId >= 3, check_right_diag(InnerBoard1, 1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !);
+    (MaxCutColId >= 4, 6 - MinRowId >= 3, check_left_diag(InnerBoard1, MaxCutColId, Winner), nonvar(Winner), Winner \= none, !)).
 
 is_tie(Board) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
