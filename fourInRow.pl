@@ -136,7 +136,7 @@ alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :-
     staticval(Pos, CurDepth, MaxDepth, Val1), % Static value Of Pos 
     (
     % if max depth exceeded or that Pos is a winning state - return Val
-    ((CurDepth > MaxDepth;
+    ((CurDepth >= MaxDepth;
     Val1 \= 0),
     Val = Val1,
     GoodPos = Pos);
@@ -199,7 +199,7 @@ playComputer(Board, UpdatedBoard) :-
     % if row = -1 it backtracks
     %Row \= -1,
     Pos = pos(Board, computer),
-    alphabeta(Pos, _, _, GoodPos, _, 4),
+    alphabeta(Pos, _, _, GoodPos, _, 5),
     GoodPos = pos(UpdatedBoard, Player).
     %for debugging:
     %UpdatedBoard = Board.
