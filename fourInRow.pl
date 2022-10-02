@@ -597,7 +597,16 @@ chooseLevel(Level) :-
         chooseLevel(Level))
     ).
 
+printInstructions :-
+    ansi_format([bold], "Welcome to Four in a Row game!\n\n", []),
+    ansi_format([bold], "The goal:\n", []),
+    format("Be the first player to connect 4 of the same colored discs in a row (either vertically, horizontally, or diagonally)\n\n"),
+    ansi_format([bold], "How to play:\n", []),
+    format("* On your turn drop one of your colored discs from the top into any of the seven columns.\nThe disk will land on the top of the rest of the disks on that column\n"),
+    format("* The game ends when there is a 4-in-a-row or a tie\n\n").
+
 start :-
     init(Board),
+    printInstructions,
     chooseLevel(Level),
     play(Board, Level, UpdatedBoard).
