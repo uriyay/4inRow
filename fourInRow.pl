@@ -93,12 +93,13 @@ getCell(Board, Row, Col, Value) :-
 
 /****  The alpha-beta algorithm ***/
 /*
-Pos = pos(Board, Player)
+Pos = pos(Board, Player, ColId)
 where Player can be computer or player
+and ColId is the move that was chosen by the last player, resulted in Board
 Since the player always play first, then he will be Max and the computer will be Min
 */
-max_to_move(pos(_, player)).
-min_to_move(pos(_, computer)).
+max_to_move(pos(_, player, _)).
+min_to_move(pos(_, computer, _)).
 
 % moves(-Pos, +PosList) :- for given Pos - retrieve all the possible positions
 moves(Pos, PosList) :-
@@ -138,10 +139,12 @@ alphabeta0(Pos, Alpha, Beta, GoodPos, Val, CurDepth, MaxDepth) :-
     staticval(Pos, CurDepth, MaxDepth, Val1), % Static value Of Pos 
     (
     % if max depth exceeded or that Pos is a winning state - return Val
-    ((CurDepth >= MaxDepth;
+    (
+    (CurDepth >= MaxDepth;
     Val1 \= 0),
     Val = Val1,
-    GoodPos = Pos);
+    GoodPos = Pos
+    );
     % else - evaluate the children of Pos
     (moves(Pos, PosList), !,
     (
@@ -182,15 +185,6 @@ betterof(Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
 betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 
 /******/
-:- dynamic level/1.
-
-getLevel(Level) :-
-    level(Level1),
-    % Easy = 2, Medium = 4, Hard = 6
-    Level is Level1 * 2.
-
-setLevel(Level) :-
-    assert(level(Level)).
 
 playUser(Board, UpdatedBoard) :-
     getInnerBoard(Board, InnerBoard),
@@ -202,9 +196,8 @@ playUser(Board, UpdatedBoard) :-
     %set Board[col, row] = 1
     updateBoard(Board, Col, Row, 1, UpdatedBoard).
 
-playComputer(Board, UpdatedBoard) :-
+playComputer(Board, Level, UpdatedBoard) :-
     format("Computer turn!\nThinking...\n"),
-    getLevel(Level),
     Pos = pos(Board, computer, _ColId),
     alphabeta(Pos, _, _, GoodPos, _, Level),
     GoodPos = pos(UpdatedBoard, Player, ColId),
@@ -577,33 +570,34 @@ won(Board, Winner) :-
     (Winner = computer, ansi_format([bold, fg(red)], "Computer won!\n", []))));
     (is_tie(Board)).
 
-play0(Board, player, UpdatedBoard) :-
+play0(Board, player, Level, UpdatedBoard) :-
     playUser(Board, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
     ((won(UpdatedBoard1, Winner));
-    play0(UpdatedBoard1, computer, UpdatedBoard)).
+    play0(UpdatedBoard1, computer, Level, UpdatedBoard)).
 
-play0(Board, computer, UpdatedBoard) :-
-    playComputer(Board, UpdatedBoard1), !,
+play0(Board, computer, Level, UpdatedBoard) :-
+    playComputer(Board, Level, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
     (won(UpdatedBoard1, Winner);
-    play0(UpdatedBoard1, player, UpdatedBoard)).
+    play0(UpdatedBoard1, player, Level, UpdatedBoard)).
 
-play(Board, UpdatedBoard) :-
+play(Board, Level, UpdatedBoard) :-
     displayBoard(Board),
-    play0(Board, player, UpdatedBoard).
+    play0(Board, player, Level, UpdatedBoard).
 
-chooseLevel :-
+chooseLevel(Level) :-
     format("Choose difficult level:\n1) Easy\n2) Medium\n3) Hard\n"),
-    getAnswer(Level),
+    getAnswer(Level1),
     (
-        (between(1, 3, Level),
-        setLevel(Level));
+        (between(1, 3, Level1),
+        % Easy = 2, Medium = 4, Hard = 6
+        Level is Level1 * 2);
         (format("Invalid level\n"),
-        chooseLevel)
+        chooseLevel(Level))
     ).
 
 start :-
     init(Board),
-    chooseLevel,
-    play(Board, UpdatedBoard).
+    chooseLevel(Level),
+    play(Board, Level, UpdatedBoard).
