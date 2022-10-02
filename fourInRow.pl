@@ -106,7 +106,7 @@ moves(Pos, PosList) :-
     PosList = [].
 
 move(Pos, Pos1) :-
-    Pos = pos(Board, Player),
+    Pos = pos(Board, Player, _ColId),
     getInnerBoard(Board, InnerBoard),
     % when choosing a column it doesn't matter who the player is
     between(1, 7, ColId1),
@@ -115,11 +115,11 @@ move(Pos, Pos1) :-
     ((Player = player, Player1 = computer, Val = 1);
     (Player = computer, Player1 = player, Val = 2)),
     updateBoard(Board, ColId1, RowId1, Val, UpdatedBoard),
-    Pos1 = pos(UpdatedBoard, Player1).
+    Pos1 = pos(UpdatedBoard, Player1, ColId1).
 
 staticval(Pos, CurDepth, MaxDepth, Val) :-
-    Pos = pos(Board, _Player),
-    (((won0(Board, Winner),
+    Pos = pos(Board, _Player, _ColId),
+    (((won1(Board, Winner),
     nonvar(Winner)),
     %since player is always max and computer is always min - 
     %if player win - return a positive value
@@ -182,6 +182,15 @@ betterof(Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
 betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 
 /******/
+:- dynamic level/1.
+
+getLevel(Level) :-
+    level(Level1),
+    % Easy = 2, Medium = 4, Hard = 6
+    Level is Level1 * 2.
+
+setLevel(Level) :-
+    assert(level(Level)).
 
 playUser(Board, UpdatedBoard) :-
     getInnerBoard(Board, InnerBoard),
@@ -194,17 +203,12 @@ playUser(Board, UpdatedBoard) :-
     updateBoard(Board, Col, Row, 1, UpdatedBoard).
 
 playComputer(Board, UpdatedBoard) :-
-    format("Computer turn!\n-------------\n"),
-    % for now - computer choose a random col
-    %random(1, 8, Col),
-    %calcRow(Col, Board, Row),
-    % if row = -1 it backtracks
-    %Row \= -1,
-    Pos = pos(Board, computer),
-    alphabeta(Pos, _, _, GoodPos, _, 5),
-    GoodPos = pos(UpdatedBoard, Player).
-    %for debugging:
-    %UpdatedBoard = Board.
+    format("Computer turn!\nThinking...\n"),
+    getLevel(Level),
+    Pos = pos(Board, computer, _ColId),
+    alphabeta(Pos, _, _, GoodPos, _, Level),
+    GoodPos = pos(UpdatedBoard, Player, ColId),
+    format("Chose column ~w\n-------------\n", [ColId]).
 
 % Check winning constraints
 
@@ -470,6 +474,90 @@ won0(Board, Winner) :-
         )
     ).
 
+won1(Board, Winner) :-
+    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    cutBoard(Board, InnerBoard1),
+    MaxCutColId is MaxColId - MinColId + 1,
+    (
+        (
+            % check rows
+            MaxCutColId >= 4,
+            nth1(I, InnerBoard1, Row),
+            Limit is MaxCutColId - 4 + 1,
+            between(1, Limit, J),
+            nth1(J, Row, C),
+            J1 is J + 1,
+            nth1(J1, Row, C),
+            J2 is J1 + 1,
+            nth1(J2, Row, C),
+            J3 is J2 + 1,
+            nth1(J3, Row, C),
+            C \= 0,
+            !
+        );
+        (
+            % check cols
+            6 - MinRowId + 1 >= 4,
+            nth1(I, InnerBoard1, Row1),
+            nth1(J, Row1, C),
+            I1 is I + 1,
+            nth1(I1, InnerBoard1, Row2),
+            nth1(J, Row2, C),
+            I2 is I1 + 1,
+            nth1(I2, InnerBoard1, Row3),
+            nth1(J, Row3, C),
+            I3 is I2 + 1,
+            nth1(I3, InnerBoard1, Row4),
+            nth1(J, Row4, C),
+            C \= 0,
+            !
+        );
+        (
+            % check right diag
+            MaxCutColId >= 4, 6 - MinRowId >= 3,
+            nth1(I, InnerBoard1, Row1),
+            nth1(J, Row1, C),
+            I1 is I + 1,
+            J1 is J + 1,
+            nth1(I1, InnerBoard1, Row2),
+            nth1(J1, Row2, C),
+            I2 is I1 + 1,
+            J2 is J1 + 1,
+            nth1(I2, InnerBoard1, Row3),
+            nth1(J2, Row3, C),
+            I3 is I2 + 1,
+            J3 is J2 + 1,
+            nth1(I3, InnerBoard1, Row4),
+            nth1(J3, Row4, C),
+            C \= 0,
+            !
+        );
+        (
+            % check left diag
+            MaxCutColId >= 4, 6 - MinRowId >= 3,
+            nth1(I, InnerBoard1, Row1),
+            nth1(J, Row1, C),
+            I1 is I + 1,
+            J1 is J - 1,
+            nth1(I1, InnerBoard1, Row2),
+            nth1(J1, Row2, C),
+            I2 is I1 + 1,
+            J2 is J1 - 1,
+            nth1(I2, InnerBoard1, Row3),
+            nth1(J2, Row3, C),
+            I3 is I2 + 1,
+            J3 is J2 - 1,
+            nth1(I3, InnerBoard1, Row4),
+            nth1(J3, Row4, C),
+            C \= 0,
+            !
+        )
+    ),
+    (
+        (C = 1, !, Winner = player);
+        (C = 2, !, Winner = computer)
+    ).
+
 is_tie(Board) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
     MinRowId = 1,
@@ -481,7 +569,7 @@ is_tie(Board) :-
 
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
-    (won0(Board, Winner),
+    (won1(Board, Winner),
     nonvar(Winner),
     Winner \= none,
     !,
@@ -505,6 +593,17 @@ play(Board, UpdatedBoard) :-
     displayBoard(Board),
     play0(Board, player, UpdatedBoard).
 
+chooseLevel :-
+    format("Choose difficult level:\n1) Easy\n2) Medium\n3) Hard\n"),
+    getAnswer(Level),
+    (
+        (between(1, 3, Level),
+        setLevel(Level));
+        (format("Invalid level\n"),
+        chooseLevel)
+    ).
+
 start :-
     init(Board),
+    chooseLevel,
     play(Board, UpdatedBoard).
