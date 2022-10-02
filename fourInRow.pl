@@ -120,7 +120,7 @@ move(Pos, Pos1) :-
 
 staticval(Pos, CurDepth, MaxDepth, Val) :-
     Pos = pos(Board, _Player, _ColId),
-    (((won1(Board, Winner),
+    (((won0(Board, Winner),
     nonvar(Winner)),
     %since player is always max and computer is always min - 
     %if player win - return a positive value
@@ -159,9 +159,9 @@ boundedbest([Pos | PosList], Alpha, Beta, GoodPos, GoodVal, CurDepth, MaxDepth) 
     alphabeta0(Pos, Alpha, Beta, _, Val, CurDepth, MaxDepth), 
     goodenough(PosList, Alpha, Beta, Pos, Val, GoodPos, GoodVal, CurDepth, MaxDepth).
 
-goodenough([], _ , _ , Pos, Val, Pos, Val, CurDepth, MaxDepth) :- !. % No Other candidate 
+goodenough([], _ , _ , Pos, Val, Pos, Val, _CurDepth, _MaxDepth) :- !. % No Other candidate 
     
-goodenough( _, Alpha, Beta, Pos, Val, Pos, Val, CurDepth, MaxDepth) :-
+goodenough( _, Alpha, Beta, Pos, Val, Pos, Val, _CurDepth, _MaxDepth) :-
     min_to_move(Pos), Val > Beta, !; % Maximizer attained upper bound 
     max_to_move(Pos), Val < Alpha, !. % Minimizer attained lower bound
 
@@ -178,7 +178,7 @@ newbounds(Alpha, Beta, Pos, Val, Alpha, Val) :-
 
 newbounds(Alpha, Beta, _, _, Alpha, Beta). % Otherwise bounds unchanged 
 
-betterof(Pos, Val, Pos1, Val1, Pos, Val) :- % Pos better than Pos1
+betterof(Pos, Val, _Pos1, Val1, Pos, Val) :- % Pos better than Pos1
     min_to_move(Pos), Val > Val1, !; 
     max_to_move(Pos), Val < Val1, !.
 
@@ -200,217 +200,10 @@ playComputer(Board, Level, UpdatedBoard) :-
     format("Computer turn!\nThinking...\n"),
     Pos = pos(Board, computer, _ColId),
     alphabeta(Pos, _, _, GoodPos, _, Level),
-    GoodPos = pos(UpdatedBoard, Player, ColId),
+    GoodPos = pos(UpdatedBoard, _Player, ColId),
     format("Chose column ~w\n-------------\n", [ColId]).
 
-% Check winning constraints
-
-check_row0([], CurWinner, Counter, Winner) :- 
-    !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
-
-check_row0([X|Rest], CurWinner, Counter, Winner) :-
-    (
-    % if Counter = 4 - set the winner to CurWinner
-    Counter >= 4, !, Winner = CurWinner
-    );
-    (
-    % else if current element = 0, then the strike has broken
-    % reset the counter and set CurWinner to none
-    X = 0, !,
-    CurWinner1 = none, Counter1 = 0,
-    check_row0(Rest, CurWinner1, Counter1, Winner)
-    );
-    (
-    % else if current element is 1 - then current winner is player
-    X = 1, !, CurWinner1 = player,
-    % if the old current winner is player - increment counter
-    ((CurWinner = player, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_row0(Rest, CurWinner1, Counter1, Winner)
-    );
-    (
-    % else if current element is 2 - then current winner is computer
-    X = 2, !, CurWinner1 = computer,
-    % if the old current winner is player - increment counter
-    ((CurWinner = computer, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1)),
-    check_row0(Rest, CurWinner1, Counter1, Winner)
-    ).
-
-
-%check_row(-Row, +Winner)
-check_row(Row, Winner) :-
-    check_row0(Row, none, 0, Winner).
-    
-check_rows0([], CurWinner, CurWinner) :- !.
-check_rows0([Row|RestRows], CurWinner, Winner) :-
-    ((check_row(Row, CurWinner1), !, Winner = CurWinner1);
-    (CurWinner1 = none, !, check_rows0(RestRows, CurWinner1, Winner))).
-
-% check_rows(-Rows, +Winner)
-check_rows(Rows, Winner) :-
-    check_rows0(Rows, none, Winner),
-    nonvar(Winner).
-
-check_col0([], ColId, CurWinner, Counter, Winner) :- 
-    !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
-
-check_col0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
-    % X = Row[ColId]
-    nth1(ColId, Row, X),
-    ((
-    % if Counter = 4 - set the winner to CurWinner
-    Counter >= 4, !, Winner = CurWinner
-    );
-    ((
-    % else if current element = 0, then the strike has broken
-    % reset the counter and set CurWinner to none
-    X = 0, !,
-    CurWinner1 = none, Counter1 = 0
-    );
-    (
-    % else if current element is 1 - then current winner is player
-    X = 1, !, CurWinner1 = player,
-    % if the old current winner is player - increment counter
-    ((CurWinner = player, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    );
-    (
-    % else if current element is 2 - then current winner is computer
-    X = 2, !, CurWinner1 = computer,
-    % if the old current winner is player - increment counter
-    ((CurWinner = computer, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    )),
-    check_col0(Rest, ColId, CurWinner1, Counter1, Winner)).
-
-check_col(Rows, ColId, Winner) :-
-    check_col0(Rows, ColId, none, 0, Winner).
-
-check_cols0(_Rows, ColId, MaxColId, CurWinner, CurWinner) :- ColId > MaxColId, !.
-check_cols0(Rows, ColId, MaxColId, CurWinner, Winner) :-
-    ((check_col(Rows, ColId, CurWinner1), Winner = CurWinner1, !);
-    (CurWinner1 = none,
-    !,
-    ColId1 is ColId + 1,
-    check_cols0(Rows, ColId1, MaxColId, CurWinner1, Winner))).
-
-check_cols(Rows, MaxColId, Winner) :-
-    check_cols0(Rows, 1, MaxColId, none, Winner),
-    nonvar(Winner).
-
-check_left_diag0([], ColId, CurWinner, Counter, Winner) :- 
-    !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
-
-check_left_diag0(_, ColId, CurWinner, Counter, Winner) :- 
-    ColId < 1, !,
-    ((Counter >= 4, !, Winner = CurWinner);
-    Winner = none).
-
-check_left_diag0([Row|Rest], ColId, CurWinner, Counter, Winner) :-
-    % X = Row[ColId]
-    nth1(ColId, Row, X),
-    ColId1 is ColId - 1,
-    ((
-    % if Counter = 4 - set the winner to CurWinner
-    Counter >= 4, !, Winner = CurWinner
-    );
-    ((
-    % else if current element = 0, then the strike has broken
-    % reset the counter and set CurWinner to none
-    X = 0, !,
-    CurWinner1 = none, Counter1 = 0
-    );
-    (
-    % else if current element is 1 - then current winner is player
-    X = 1, !, CurWinner1 = player,
-    % if the old current winner is player - increment counter
-    ((CurWinner = player, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    );
-    (
-    % else if current element is 2 - then current winner is computer
-    X = 2, !, CurWinner1 = computer,
-    % if the old current winner is player - increment counter
-    ((CurWinner = computer, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    )),
-    % check in both next element in current diognal and also in another diagonal
-    ((check_left_diag0(Rest, ColId1, CurWinner1, Counter1, Winner), Winner \= none);
-    %check in a new diagonal with Rest lines
-    (check_left_diag0(Rest, ColId, none, 0, Winner), Winner \= none);
-    %check in a new diagonal with all lines
-    (check_left_diag0([Row|Rest], ColId1, none, 0, Winner), Winner \= none)
-    )).
-
-check_right_diag0([], ColId, MaxColId, CurWinner, Counter, Winner) :- 
-    !,
-    (Counter >= 4, !, Winner = CurWinner);
-    Winner = none.
-
-check_right_diag0(_, ColId, MaxColId, CurWinner, Counter, Winner) :- 
-    ColId > MaxColId,
-    !,
-    ((Counter >= 4, !, Winner = CurWinner);
-    Winner = none).
-
-check_right_diag0([Row|Rest], ColId, MaxColId, CurWinner, Counter, Winner) :-
-    % X = Row[ColId]
-    nth1(ColId, Row, X),
-    ColId1 is ColId + 1,
-    ((
-    % if Counter = 4 - set the winner to CurWinner
-    Counter >= 4, !, Winner = CurWinner
-    );
-    ((
-    % else if current element = 0, then the strike has broken
-    % reset the counter and set CurWinner to none
-    X = 0, !,
-    CurWinner1 = none, Counter1 = 0
-    );
-    (
-    % else if current element is 1 - then current winner is player
-    X = 1, !, CurWinner1 = player,
-    % if the old current winner is player - increment counter
-    ((CurWinner = player, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    );
-    (
-    % else if current element is 2 - then current winner is computer
-    X = 2, !, CurWinner1 = computer,
-    % if the old current winner is player - increment counter
-    ((CurWinner = computer, !, Counter1 is Counter + 1);
-    % else - Counter1 = 1
-    (Counter1 = 1))
-    )),
-    % check the current diagoanl
-    ((check_right_diag0(Rest, ColId1, MaxColId, CurWinner1, Counter1, Winner), Winner \= none);
-    % check a new diagonal
-    (check_right_diag0(Rest, ColId, MaxColId, none, 0, Winner), Winner \= none);
-    %check in a new diagonal with all lines
-    (check_right_diag0([Row|Rest], ColId1, MaxColId, none, 0, Winner), Winner \= none)
-    )).
-
-check_right_diag(Rows, ColId, MaxColId, Winner) :-
-    check_right_diag0(Rows, ColId, MaxColId, none, 0, Winner).
-
-check_left_diag(Rows, ColId, Winner) :-
-    check_left_diag0(Rows, ColId, none, 0, Winner).
-
-cutRow([], CurColId, MinColId, MaxColId, []) :- !.
+cutRow([], _CurColId, _MinColId, _MaxColId, []) :- !.
 
 cutRow([X|Rest], CurColId, MinColId, MaxColId, [X|SubCol]) :-
     CurColId >= MinColId,
@@ -418,7 +211,7 @@ cutRow([X|Rest], CurColId, MinColId, MaxColId, [X|SubCol]) :-
     CurColId1 is CurColId + 1,
     cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
 
-cutRow([X|Rest], CurColId, MinColId, MaxColId, SubCol) :-
+cutRow([_X|Rest], CurColId, MinColId, MaxColId, SubCol) :-
     CurColId1 is CurColId + 1,
     cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
 
@@ -431,7 +224,7 @@ cutBoard0([Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, [Row1|SubBoard]) :
     cutRow(Row, 1, MinColId, MaxColId, Row1),
     cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
 
-cutBoard0([Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, SubBoard) :-
+cutBoard0([_Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, SubBoard) :-
     CurRowId < MinRowId,
     CurRowId1 is CurRowId + 1,
     cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
@@ -441,41 +234,14 @@ cutBoard(Board, SubBoard) :-
     cutBoard0(InnerBoard, 1, MinRowId, MinColId, MaxColId, SubBoard).
 
 won0(Board, Winner) :-
-    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
-    cutBoard(Board, InnerBoard1),
-    MaxCutColId is MaxColId - MinColId + 1,
-    (
-        (
-            MaxCutColId >= 4,
-            check_rows(InnerBoard1, Winner),
-            nonvar(Winner), Winner \= none, !
-        );
-        (
-            6 - MinRowId + 1 >= 4,
-            check_cols(InnerBoard1, MaxCutColId, Winner),
-            nonvar(Winner), Winner \= none, !
-        );
-        (
-            MaxCutColId >= 4, 6 - MinRowId >= 3,
-            check_right_diag(InnerBoard1, 1, MaxCutColId, Winner),
-            nonvar(Winner), Winner \= none, !
-        );
-        (
-            MaxCutColId >= 4, 6 - MinRowId >= 3,
-            check_left_diag(InnerBoard1, MaxCutColId, Winner),
-            nonvar(Winner), Winner \= none, !
-        )
-    ).
-
-won1(Board, Winner) :-
-    Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    Board = (MinRowId, MinColId, MaxColId, _InnerBoard),
     cutBoard(Board, InnerBoard1),
     MaxCutColId is MaxColId - MinColId + 1,
     (
         (
             % check rows
             MaxCutColId >= 4,
-            nth1(I, InnerBoard1, Row),
+            nth1(_I, InnerBoard1, Row),
             Limit is MaxCutColId - 4 + 1,
             between(1, Limit, J),
             nth1(J, Row, C),
@@ -562,7 +328,7 @@ is_tie(Board) :-
 
 % check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
-    (won1(Board, Winner),
+    (won0(Board, Winner),
     nonvar(Winner),
     Winner \= none,
     !,
@@ -573,13 +339,13 @@ won(Board, Winner) :-
 play0(Board, player, Level, UpdatedBoard) :-
     playUser(Board, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
-    ((won(UpdatedBoard1, Winner));
+    ((won(UpdatedBoard1, _Winner));
     play0(UpdatedBoard1, computer, Level, UpdatedBoard)).
 
 play0(Board, computer, Level, UpdatedBoard) :-
     playComputer(Board, Level, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
-    (won(UpdatedBoard1, Winner);
+    (won(UpdatedBoard1, _Winner);
     play0(UpdatedBoard1, player, Level, UpdatedBoard)).
 
 play(Board, Level, UpdatedBoard) :-
@@ -609,4 +375,4 @@ start :-
     init(Board),
     printInstructions,
     chooseLevel(Level),
-    play(Board, Level, UpdatedBoard).
+    play(Board, Level, _UpdatedBoard).
