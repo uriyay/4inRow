@@ -63,11 +63,22 @@ calcRow0(Col, Board, CurRow, Row) :-
 calcRow(Col, Board, Row) :-
     calcRow0(Col, Board, 6, Row).
 
-getCol(Col) :-
-    format("Where do you want to place your token? (1-7)\n"),
-    getAnswer(Col1),
-    (number(Col1), 1 =< Col1, Col1 =< 7, Col = Col1);
-    (format("Error: invalid answer\n"), getCol(Col)).
+getCol(Col, Action) :-
+    format("Where do you want to place your token? (1-7, x for exit, r for restart)\n"),
+    getAnswer(Ans),
+    ((
+        Ans = x,
+        !, Action = exit
+    );
+    (
+        Ans = r,
+        !, Action = restart
+    );
+    (
+        Col1 = Ans,
+        (number(Col1), 1 =< Col1, Col1 =< 7, Col = Col1);
+        (format("Error: invalid answer\n"), getCol(Col, Action))
+    )).
 
 updateBoard(Board, Col, Row, Value, UpdatedBoard) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
@@ -186,15 +197,21 @@ betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 
 /******/
 
-playUser(Board, UpdatedBoard) :-
+playUser(Board, UpdatedBoard, Action) :-
     getInnerBoard(Board, InnerBoard),
     format("Player turn!\n-------------\n"),
-    getCol(Col),
-    calcRow(Col, InnerBoard, Row),
-    %if Row = -1 currently it fail
-    Row \= -1,
-    %set Board[col, row] = 1
-    updateBoard(Board, Col, Row, 1, UpdatedBoard).
+    getCol(Col, Action),
+    (
+        (
+            nonvar(Action)
+        );
+        (
+        calcRow(Col, InnerBoard, Row),
+        %if Row = -1 currently it fail
+        Row \= -1,
+        %set Board[col, row] = 1
+        updateBoard(Board, Col, Row, 1, UpdatedBoard))
+    ).
 
 playComputer(Board, Level, UpdatedBoard) :-
     format("Computer turn!\nThinking...\n"),
@@ -336,21 +353,28 @@ won(Board, Winner) :-
     (Winner = computer, ansi_format([bold, fg(red)], "Computer won!\n", []))));
     (is_tie(Board)).
 
-play0(Board, player, Level, UpdatedBoard) :-
-    playUser(Board, UpdatedBoard1), !,
-    displayBoard(UpdatedBoard1),
-    ((won(UpdatedBoard1, _Winner));
-    play0(UpdatedBoard1, computer, Level, UpdatedBoard)).
+play0(Board, player, Level, UpdatedBoard, Action) :-
+    playUser(Board, UpdatedBoard1, Action), !,
+    (
+        (
+            nonvar(Action)
+        );
+        (
+        displayBoard(UpdatedBoard1),
+        ((won(UpdatedBoard1, _Winner));
+        play0(UpdatedBoard1, computer, Level, UpdatedBoard, Action))
+        )
+    ).
 
-play0(Board, computer, Level, UpdatedBoard) :-
+play0(Board, computer, Level, UpdatedBoard, Action) :-
     playComputer(Board, Level, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
     (won(UpdatedBoard1, _Winner);
-    play0(UpdatedBoard1, player, Level, UpdatedBoard)).
+    play0(UpdatedBoard1, player, Level, UpdatedBoard, Action)).
 
-play(Board, Level, UpdatedBoard) :-
+play(Board, Level, UpdatedBoard, Action) :-
     displayBoard(Board),
-    play0(Board, player, Level, UpdatedBoard).
+    play0(Board, player, Level, UpdatedBoard, Action).
 
 chooseLevel(Level) :-
     format("Choose difficult level:\n1) Easy\n2) Medium\n3) Hard\n"),
@@ -375,4 +399,8 @@ start :-
     init(Board),
     printInstructions,
     chooseLevel(Level),
-    play(Board, Level, _UpdatedBoard).
+    play(Board, Level, _UpdatedBoard, Action),
+    (
+        (Action = exit);
+        (Action = restart, start)
+    ).
