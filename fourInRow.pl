@@ -1,9 +1,36 @@
-/*
-initial cell: 0
-player cell: 1
-computer cell: 2
-*/
+/******************************************************************************
+*__________________________Mamam17 - Final Project____________________________*
+*					 20596 - Prolog & Artificial Intelligence				  *				
+*------------|----------------------------------------------------------------*														
+* Programmer | Uriya Yavniely           									  * 
+*------------|----------------------------------------------------------------*
+* File Name  | fourinrow.pl													  * 
+*------------|----------------------------------------------------------------*
+* Description| Four in Row board game application against the computer, 	  *
+*			 | implemented with the alpha-beta search algorithm.			  *
+*------------|----------------------------------------------------------------*
+* Synopsis   | Start the game with the predicate start/0. 			 		  *
+* 		     | The game will start & guide you with further instructions.  	  *
+* 		     | The goal:                                                      *
+*            | Be the first player to connect 4 of the same colored discs     *
+*            | in a row (either vertically, horizontally, or diagonally)      *
+*            | How to play:                                                   *
+*            | On your turn drop one of your colored discs from the top into  *
+*            | any of the seven columns. The disk will land on the top of the *
+*            | rest of the disks on that column.                              *
+*            | The game ends when there is a 4-in-a-row or a tie.             *
+*-----------------------------------------------------------------------------*/
 
+/* init(+Board) :- Initializes a board.
+        The result board will be a tuple of (MinRowId, MinColId, MaxColId, InnerBoard)
+        Where InnerBoard is an empty board of 6 rows and 7 columns.
+        The InnerBoard is represented by list of rows, where the first row is the top row
+        and the last row is the bottom row. The first items in each row are the left-most column
+        and the last items in each row are the right-most column.
+        MinRowId is the minimal row index that contains a disk, which is 6 at start
+        MinColId is the minimal column index that contains a disk, which is 1 at start
+        And MaxColId is the maximal column that contains a disk, which is 1 at start
+*/
 init(Board) :-
     %Board = (MinRowId, MinColId, MaxColId, InnerBoard)
     % 7 columns and 6 rows
