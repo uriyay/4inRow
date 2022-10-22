@@ -288,7 +288,8 @@ betterof(_, _ , Pos1, Val1, Pos1, Val1). % Otherwise Pos1 better
 
 /******/
 
-% playUser(-Board, +UpdatedBoard, +Action) :- play user turn with Board
+% playUser(-Board, +UpdatedBoard, +Action) :- 
+%       play user turn with Board
 %       return the resulted board in UpdatedBoard
 %       if the user want to exit or restart - Action will be set to one of them respectively
 playUser(Board, UpdatedBoard, Action) :-
@@ -311,55 +312,88 @@ playUser(Board, UpdatedBoard, Action) :-
         )
     ).
 
-% playComputer(-Board, )
+% playComputer(-Board, -Level, +UpdatedBoard) :-
+%       play computer turn with Board with difficult level Level
+%       return the resulted board in UpdatedBoard
 playComputer(Board, Level, UpdatedBoard) :-
     format("Computer turn!\nThinking...\n"),
     Pos = pos(Board, computer, _ColId),
+    % get the best move with alphabeta
     alphabeta(Pos, _, _, GoodPos, _, Level),
     GoodPos = pos(UpdatedBoard, _Player, ColId),
     format("Chose column ~w\n-------------\n", [ColId]).
 
+% cutRow(-Row, -CurColId, -MinColId, -MaxColId, +CutRow) :-
+%       gets Row and returns a subset of row in CutRow,
+%       that includes each element of Row if its index is in the closed interval of [MinColId, MaxColId]
+%       and bigger/equal than CurColId
 cutRow([], _CurColId, _MinColId, _MaxColId, []) :- !.
 
 cutRow([X|Rest], CurColId, MinColId, MaxColId, [X|SubCol]) :-
+    % include X in CutRow if CurColId in the closed interval of [MinColId, MaxColId]
     CurColId >= MinColId,
     CurColId =< MaxColId, !,
+    % call recursively to cutRow with the rest of the row
     CurColId1 is CurColId + 1,
     cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
 
 cutRow([_X|Rest], CurColId, MinColId, MaxColId, SubCol) :-
+    % ignore X and call recursively to cutRow with the rest of the row
     CurColId1 is CurColId + 1,
     cutRow(Rest, CurColId1, MinColId, MaxColId, SubCol).
 
-% cutBoard0(-InnerBoard, -MinRowId, -MinColId, -MaxColId, +SubBoard)
+% cutBoard0(-InnerBoard, -MinRowId, -MinColId, -MaxColId, +SubBoard) :-
+%       gets an InnerBoard and returns SubBoard that includes only columns with indexes
+%       in the closed interval [MinColId, MaxColId]
+%       and includes only rows with indexes in the closed interval [MinRowId, 6]
+
+% if there aren't any rows left - return an empty list as SubBoard
 cutBoard0([], _CurRowId, _MinRowId, _MinColId, _MaxColId, []) :- !.
 
 cutBoard0([Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, [Row1|SubBoard]) :-
+    % if CurRowId is in the closed interval [MinRowId, 6]
     CurRowId >= MinRowId, !,
     CurRowId1 is CurRowId + 1,
+    % get a cut row that includes only the columns in the closed interval [MinColId, MaxColId]
     cutRow(Row, 1, MinColId, MaxColId, Row1),
+    % call recursively to cutBoard0 with the rest of the rows
     cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
 
 cutBoard0([_Row|Rest], CurRowId, MinRowId, MinColId, MaxColId, SubBoard) :-
+    % if CurRowId is not in the closed interval [MinRowId, 6]
+    % (there are only 6 rows, so the upper limit is checked implictly)
+    % then skip this row and call recursively to cutBoard0 with the rest of the rows
     CurRowId < MinRowId,
     CurRowId1 is CurRowId + 1,
     cutBoard0(Rest, CurRowId1, MinRowId, MinColId, MaxColId, SubBoard).
 
+% cutBoard(-Board, +SubBoard) :-
+%       gets a Board and returns a SubBoard that contains the minimal rectangle cut
+%       that contains data (1 or 2)
+%       it does that by using a maintained metadata of the minimal row and column
+%       that contains data, and the maximal column that contains data
+%       (the maximal row is always 6, since at the beginning of the game the disks are inserted to the last row - the 6 row)
 cutBoard(Board, SubBoard) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
     cutBoard0(InnerBoard, 1, MinRowId, MinColId, MaxColId, SubBoard).
 
+% won0(-Board, +Winner) :-
+%       gets a Board and returns Winner if any
 won0(Board, Winner) :-
     Board = (MinRowId, MinColId, MaxColId, _InnerBoard),
     cutBoard(Board, InnerBoard1),
     MaxCutColId is MaxColId - MinColId + 1,
     (
         (
-            % check rows
+            % Search for any combination of 4 identical cells (different than 0) in row
             MaxCutColId >= 4,
+            % gets an arbitrary I, an index of row in InnerBoard1
             nth1(_I, InnerBoard1, Row),
+            % gets an arbitrary J that is in the closed interval [1, MaxCutColId - 4 + 1]
+            % this J is the first element in the row, so it cannot be bigger than MaxCutColId - 4 + 1
             Limit is MaxCutColId - 4 + 1,
             between(1, Limit, J),
+            % assert that all of the 4 sequential cells has the same value C, and that its different than 0
             nth1(J, Row, C),
             J1 is J + 1,
             nth1(J1, Row, C),
@@ -371,10 +405,13 @@ won0(Board, Winner) :-
             !
         );
         (
-            % check cols
+            % Search for any combination of 4 identical cells (different than 0) in columns
             6 - MinRowId + 1 >= 4,
+            % gets an arbitrary I, an index of row in InnerBoard1
             nth1(I, InnerBoard1, Row1),
+            % gets an arbitrary J, an index of column in row
             nth1(J, Row1, C),
+            % assert that all the sequential elements has the same value that is different than 0
             I1 is I + 1,
             nth1(I1, InnerBoard1, Row2),
             nth1(J, Row2, C),
@@ -388,10 +425,14 @@ won0(Board, Winner) :-
             !
         );
         (
-            % check right diag
+            % Search for any combination of 4 identical cells (different than 0) in the right diagonals
+            % Only check it if the minimal cut is big enough to contain a diagonal (at least 4 columns and 4 rows)
             MaxCutColId >= 4, 6 - MinRowId >= 3,
+            % gets an arbitrary I, an index of row in InnerBoard1
             nth1(I, InnerBoard1, Row1),
+            % gets an arbitrary J, an index of column in row
             nth1(J, Row1, C),
+            % assert that all the sequential elements has the same value that is different than 0
             I1 is I + 1,
             J1 is J + 1,
             nth1(I1, InnerBoard1, Row2),
@@ -408,10 +449,14 @@ won0(Board, Winner) :-
             !
         );
         (
-            % check left diag
+            % Search for any combination of 4 identical cells (different than 0) in the left diagonals
+            % Only check it if the minimal cut is big enough to contain a diagonal (at least 4 columns and 4 rows)
             MaxCutColId >= 4, 6 - MinRowId >= 3,
+            % gets an arbitrary I, an index of row in InnerBoard1
             nth1(I, InnerBoard1, Row1),
+            % gets an arbitrary J, an index of column in row
             nth1(J, Row1, C),
+            % assert that all the sequential elements has the same value that is different than 0
             I1 is I + 1,
             J1 is J - 1,
             nth1(I1, InnerBoard1, Row2),
@@ -429,63 +474,114 @@ won0(Board, Winner) :-
         )
     ),
     (
+        % if the value was 1 then declare that winner is player
         (C = 1, !, Winner = player);
+        % otherwise, the winner is computer
         (C = 2, !, Winner = computer)
     ).
 
+% is_tie(-Board) :- true if we got to tie (a stalemate)
 is_tie(Board) :-
     Board = (MinRowId, MinColId, MaxColId, InnerBoard),
+    % if the whole board is full
     MinRowId = 1,
     MinColId = 1,
     MaxColId = 7,
     InnerBoard = [FirstRow|_Tail],
+    % and there is no column with 0 at the top of it
     not(member(0, FirstRow)),
+    % declare a tie
     ansi_format([bold, fg(blue)], "Tie!\n", []).
 
-% check if there is a win: 4 in row, in column or in diagonal
+% won(-Board, +Winner) :- 
+%       check if there is a win: 4 in row, in column or in diagonal
 won(Board, Winner) :-
-    (won0(Board, Winner),
-    nonvar(Winner),
-    Winner \= none,
-    !,
-    ((Winner = player, !, ansi_format([bold, fg(green)], "You won!\n", []));
-    (Winner = computer, ansi_format([bold, fg(red)], "Computer won!\n", []))));
-    (is_tie(Board)).
+    (
+        won0(Board, Winner),
+        nonvar(Winner),
+        Winner \= none,
+        !,
+        (
+            (
+                Winner = player, !,
+                ansi_format([bold, fg(green)], "You won!\n", [])
+            );
+            (
+                Winner = computer,
+                ansi_format([bold, fg(red)], "Computer won!\n", [])
+            )
+        )
+    );
+    (
+        is_tie(Board)
+    ).
 
+% play0(-Board, -Player, -Level, +UpdatedBoard, +Action) :-
+%       play the turn of Player with Board in difficult Level
+%       returns UpdatedBoard or Action (exit/restart)
+
+% the player turn
 play0(Board, player, Level, UpdatedBoard, Action) :-
+    % play the user turn
     playUser(Board, UpdatedBoard1, Action), !,
     (
         (
+            % if Action is set (to exit/restart) - then stop the recursion and return
             nonvar(Action)
         );
         (
-        displayBoard(UpdatedBoard1),
-        ((won(UpdatedBoard1, _Winner));
-        play0(UpdatedBoard1, computer, Level, UpdatedBoard, Action))
+            % otherwise - display the board and check if there was any victory to one of sides,
+            % or a tie
+            % if there is - stop the recursion and return
+            % if not - play the computer turn recursively
+            displayBoard(UpdatedBoard1),
+            (
+                (
+                    won(UpdatedBoard1, _Winner)
+                );
+                play0(UpdatedBoard1, computer, Level, UpdatedBoard, Action)
+            )
         )
     ).
 
+% the computer turn
 play0(Board, computer, Level, UpdatedBoard, Action) :-
     playComputer(Board, Level, UpdatedBoard1), !,
     displayBoard(UpdatedBoard1),
-    (won(UpdatedBoard1, _Winner);
-    play0(UpdatedBoard1, player, Level, UpdatedBoard, Action)).
+    (
+        % if any victory achieved or a tie - stop the recursion and return
+        won(UpdatedBoard1, _Winner);
+        % otherwise - play the user turn recursively
+        play0(UpdatedBoard1, player, Level, UpdatedBoard, Action)
+    ).
 
+% play(-Board, -Level, +UpdatedBoard, +Action) :-
+%   play the game recursively, start by playing the user turn.
+%   returns the updated board in UpdatedBoard or Action if set (to exit/restart)
 play(Board, Level, UpdatedBoard, Action) :-
     displayBoard(Board),
     play0(Board, player, Level, UpdatedBoard, Action).
 
+% chooseLevel(+Level) :- let the user choose the difficult level of the game
+%       this level will be multiplied by 2 and becomes the depth level of the turns that
+%       the alpha-beta algorithm sees into the future 
 chooseLevel(Level) :-
     format("Choose difficult level:\n1) Easy\n2) Medium\n3) Hard\n"),
     getAnswer(Level1),
     (
-        (between(1, 3, Level1),
-        % Easy = 2, Medium = 4, Hard = 6
-        Level is Level1 * 2);
-        (format("Invalid level\n"),
-        chooseLevel(Level))
+        (
+            between(1, 3, Level1),
+            % Easy = 2, Medium = 4, Hard = 6
+            Level is Level1 * 2
+        );
+        (
+            % if the level that was chosen is invalid - try again
+            format("Invalid level\n"),
+            chooseLevel(Level)
+        )
     ).
 
+% printInstructions :- print the game instructions
 printInstructions :-
     ansi_format([bold], "Welcome to Four in a Row game!\n\n", []),
     ansi_format([bold], "The goal:\n", []),
@@ -494,6 +590,7 @@ printInstructions :-
     format("* On your turn drop one of your colored discs from the top into any of the seven columns.\nThe disk will land on the top of the rest of the disks on that column\n"),
     format("* The game ends when there is a 4-in-a-row or a tie\n\n").
 
+% starts the game
 start :-
     % initializes an empty 6x7 board
     init(Board),
