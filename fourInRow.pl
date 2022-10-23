@@ -93,14 +93,18 @@ getAnswer(Answer) :-
 %   If such a row cannot be retrieved - return -1
 calcRow0(Col, Board, CurRow, Row) :-
     (CurRow < 0, !, Row = -1);
-    (nth1(CurRow, Board, RowElement),
-    nth1(Col, RowElement, Cell),
-    %if Cell = 0 then return Row = CurRow
-    (Cell = 0, !, Row = CurRow);
-    %else if calcRow0 returns a valid row - return it
-    (CurRow1 is CurRow - 1, !, calcRow0(Col, Board, CurRow1, Row));
-    %else - return -1
-    (Row = -1)
+    (
+        nth1(CurRow, Board, RowElement),
+        nth1(Col, RowElement, Cell),
+        %if Cell = 0 then return Row = CurRow
+        (Cell = 0, !, Row = CurRow);
+        %else, call recursively to calcRow0 and return its result if its a valid row
+        (
+            CurRow1 is CurRow - 1, !,
+            calcRow0(Col, Board, CurRow1, Row)
+        );
+        %else - return -1
+        (Row = -1)
     ).
 
 % calcRow(-Col, -Board, +Row) :- calculates the first empty row index in column Col
@@ -114,19 +118,21 @@ calcRow(Col, Board, Row) :-
 getCol(Col, Action) :-
     format("Where do you want to place your token? (1-7, x for exit, r for restart)\n"),
     getAnswer(Ans),
-    ((
-        Ans = x,
-        !, Action = exit
-    );
     (
-        Ans = r,
-        !, Action = restart
-    );
-    (
-        Col1 = Ans,
-        (number(Col1), 1 =< Col1, Col1 =< 7, Col = Col1);
-        (format("Error: invalid answer\n"), getCol(Col, Action))
-    )).
+        (
+            Ans = x,
+            !, Action = exit
+        );
+        (
+            Ans = r,
+            !, Action = restart
+        );
+        (
+            Col1 = Ans,
+            (number(Col1), 1 =< Col1, Col1 =< 7, Col = Col1);
+            (format("Error: invalid answer\n"), getCol(Col, Action))
+        )
+    ).
 
 % updateBoard(-Board, -Col, -Row, -Value, +UpdatedBoard) :-
 %       set the cell value at column Col and row Row to Value
@@ -141,12 +147,21 @@ updateBoard(Board, Col, Row, Value, UpdatedBoard) :-
     nth1(Col, RowElement1, Value, RowElementRest),
     %build a new UpdatedBoard which at Row there is RowElement1
     nth1(Row, UpdatedInnerBoard, RowElement1, RestRows),
-    ((Row < MinRowId, !, MinRowId1 = Row);
-    (MinRowId1 = MinRowId)),
-    ((Col < MinColId, !, MinColId1 = Col);
-    (MinColId1 = MinColId)),
-    ((Col > MaxColId, !, MaxColId1 = Col);
-    (MaxColId1 = MaxColId)),
+    (
+        % update MinRowId if the row index that a disk was inserted to is smaller than MinRowId
+        (Row < MinRowId, !, MinRowId1 = Row);
+        (MinRowId1 = MinRowId)
+    ),
+    (
+        % update MinColId if the column index that a disk was inserted to is smaller than MinColId
+        (Col < MinColId, !, MinColId1 = Col);
+        (MinColId1 = MinColId)
+    ),
+    (
+        % update MaxColId if the column index that a disk was inserted to is bigger than MaxColId
+        (Col > MaxColId, !, MaxColId1 = Col);
+        (MaxColId1 = MaxColId)
+    ),
     UpdatedBoard = (MinRowId1, MinColId1, MaxColId1, UpdatedInnerBoard).
 
 % getCell(-Board, -Row, -Col, +Value) :-
