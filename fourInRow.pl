@@ -63,7 +63,7 @@ displayLine([X|Rest]) :-
         (X = 2, !, D = "#", FG=red)
     ),
     format("["),
-    ansi_format([bold, fg(FG)], "~w", D),
+    ansi_format([bold, fg(FG)], "~w", [D]),
     format("]"),
     displayLine(Rest).
 
@@ -597,6 +597,7 @@ start :-
     printInstructions,
     % let the user choose the difficult level
     chooseLevel(Level),
+    nl,
     % start playing
     % this predicate will call recursively to all play turns
     % it will exit only if someone win or if the user asked to exit or restart the game
